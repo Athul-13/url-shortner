@@ -1,217 +1,223 @@
-# URL Shortener - Django + React TypeScript Application
+# URL Shortener Platform
 
-A full-stack URL shortener application built with Django backend and React TypeScript frontend, containerized with Docker and PostgreSQL.
+A namespaced URL shortening platform with organizational privileges and secure access control.
+
+## Features
+
+- **User Authentication**: JWT-based authentication with signup and login
+- **Organizations**: Users can create and manage multiple organizations
+- **Role-Based Access Control**: Admin, Editor, and Viewer roles
+- **Namespaces**: Globally unique namespaces for organizing short URLs
+- **Short URL Management**: Create, update, and delete short URLs with customizable codes
+- **Auto-generated Short Codes**: Random short codes if not specified by user
+
+## Tech Stack
+
+### Backend
+- Django 4.2
+- Django REST Framework
+- PostgreSQL
+- JWT Authentication (djangorestframework-simplejwt)
+
+### Frontend
+- React 19
+- TypeScript
+- Material-UI
+- React Router
+- Axios
 
 ## Project Structure
 
 ```
 url-short/
-├── backend/          # Django backend application
-├── frontend/         # React TypeScript frontend application
-├── docker-compose.yml
-└── README.md
+├── backend/
+│   ├── apps/
+│   │   ├── users/          # User authentication
+│   │   ├── organizations/  # Organization management
+│   │   ├── namespaces/     # Namespace management
+│   │   └── urls/          # Short URL management
+│   ├── core/
+│   │   ├── constants.py    # API endpoint constants
+│   │   └── permissions.py  # Custom permissions
+│   └── url_short/
+│       └── settings.py     # Django settings
+├── frontend/
+│   └── src/
+│       ├── api/            # API client and services
+│       ├── components/     # Reusable components
+│       ├── contexts/       # React contexts (Auth)
+│       ├── pages/          # Page components
+│       ├── constants/      # Frontend constants
+│       └── utils/          # Utility functions
+└── docker-compose.yml
 ```
-
-## Prerequisites
-
-- Docker Desktop installed and running
-- Git (optional, for version control)
 
 ## Setup Instructions
 
-### 1. Environment Configuration
+### Backend Setup
 
-The application uses environment variables for all configuration. You need to create `.env` files from the provided examples:
-
-#### Root `.env` file (for Docker Compose)
-
+1. Navigate to the backend directory:
 ```bash
+cd backend
+```
+
+2. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Create a `.env` file based on `.env.example` and configure your settings:
+```bash
+# Copy example file
 cp .env.example .env
+
+# Edit .env with your configuration
 ```
 
-Edit `.env` and configure:
-- PostgreSQL database credentials
-- Service ports
-- Container names
-
-#### Backend `.env` file
-
+4. Run migrations:
 ```bash
-cp backend/.env.example backend/.env
+python manage.py makemigrations
+python manage.py migrate
 ```
 
-Edit `backend/.env` and configure:
-- Django secret key (change in production!)
-- Debug mode
-- Allowed hosts
-- Database connection settings
-- CORS allowed origins
-
-#### Frontend `.env` file
-
+5. Create a superuser (optional):
 ```bash
-cp frontend/.env.example frontend/.env
+python manage.py createsuperuser
 ```
 
-Edit `frontend/.env` and configure:
-- API base URL
-- Development server port
-
-### 2. Build and Start Services
-
-Build and start all services (PostgreSQL, Django backend, React frontend):
-
+6. Run the development server:
 ```bash
-docker-compose up --build
+python manage.py runserver
 ```
 
-Or run in detached mode:
+The backend will be available at `http://localhost:8000`
 
+### Frontend Setup
+
+1. Navigate to the frontend directory:
 ```bash
-docker-compose up -d --build
+cd frontend
 ```
 
-### 3. Access the Application
+2. Install dependencies:
+```bash
+npm install
+```
 
-- **Frontend**: http://localhost:5174
-- **Backend API**: http://localhost:8000
-- **PostgreSQL**: localhost:5433 (credentials from `.env`)
+3. Create a `.env` file:
+```bash
+# Copy example file
+cp .env.example .env
 
-### 4. Database Migrations
+# Edit .env with your configuration
+# Default: VITE_API_BASE_URL=http://localhost:8000
+```
 
-The Django backend automatically runs migrations on startup via the `docker-entrypoint.sh` script. If you need to run migrations manually:
+4. Run the development server:
+```bash
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173`
+
+### Docker Setup (Optional)
+
+If you prefer using Docker:
 
 ```bash
+# Start all services
+docker-compose up -d
+
+# Run migrations
 docker-compose exec backend python manage.py migrate
-```
 
-### 5. Create Django Superuser (Optional)
-
-To access the Django admin panel:
-
-```bash
+# Create superuser
 docker-compose exec backend python manage.py createsuperuser
 ```
 
-Then access the admin at: http://localhost:8000/admin
+## Usage Flow
 
-## Docker Commands
+### For New Users (Signup)
 
-### Start services
-```bash
-docker-compose up
-```
+1. **Sign Up**: User creates an account and provides an organization name
+2. **Auto-login**: User is automatically logged in after signup
+3. **Create Organization** (optional): User can create additional organizations
+4. **Dashboard**: User is redirected to the dashboard
 
-### Start services in background
-```bash
-docker-compose up -d
-```
+### For Existing Users (Login)
 
-### Stop services
-```bash
-docker-compose down
-```
+1. **Login**: User signs in with credentials
+2. **Dashboard**: User is directly redirected to the dashboard
 
-### Stop services and remove volumes (⚠️ deletes database data)
-```bash
-docker-compose down -v
-```
+## API Endpoints
 
-### View logs
-```bash
-# All services
-docker-compose logs -f
+### Authentication
+- `POST /api/auth/register/` - Register new user and create organization
+- `POST /api/auth/login/` - Login user
+- `GET /api/auth/me/` - Get current user info
 
-# Specific service
-docker-compose logs -f backend
-docker-compose logs -f frontend
-docker-compose logs -f db
-```
+### Organizations
+- `GET /api/organizations/` - List user's organizations
+- `POST /api/organizations/` - Create new organization
+- `GET /api/organizations/{id}/` - Get organization details
 
-### Execute commands in containers
-```bash
-# Backend
-docker-compose exec backend python manage.py <command>
+### Namespaces
+- `GET /api/namespaces/` - List namespaces
+- `POST /api/namespaces/` - Create namespace (Admin only)
+- `GET /api/namespaces/{id}/` - Get namespace details
 
-# Frontend
-docker-compose exec frontend npm <command>
+### Short URLs
+- `GET /api/urls/` - List short URLs
+- `POST /api/urls/` - Create short URL
+- `GET /api/urls/{id}/` - Get short URL details
+- `PUT /api/urls/{id}/` - Update short URL (Admin/Editor)
+- `DELETE /api/urls/{id}/` - Delete short URL (Admin/Editor)
 
-# Database
-docker-compose exec db psql -U <POSTGRES_USER> -d <POSTGRES_DB>
-```
+## Role Permissions
 
-### Rebuild services
-```bash
-docker-compose up --build
-```
-
-## Development
-
-### Backend Development
-
-The backend code is mounted as a volume, so changes to Python files will be reflected immediately. However, you may need to restart the container for some changes:
-
-```bash
-docker-compose restart backend
-```
-
-### Frontend Development
-
-The frontend code is mounted as a volume with hot module replacement enabled. Changes to React/TypeScript files will automatically reload in the browser.
-
-### Database Access
-
-Connect to PostgreSQL using any PostgreSQL client with:
-- Host: `localhost`
-- Port: `5433` (or value from `.env`)
-- Database: Value from `POSTGRES_DB` in `.env`
-- Username: Value from `POSTGRES_USER` in `.env`
-- Password: Value from `POSTGRES_PASSWORD` in `.env`
+- **Admin**: Full access - can create namespaces, invite users, create/edit/delete URLs
+- **Editor**: Can create/edit/delete URLs, view short URLs
+- **Viewer**: Can only view short URLs
 
 ## Environment Variables
 
-All configuration is managed through environment variables. See the `.env.example` files for required variables:
+### Backend (.env)
+```
+SECRET_KEY=your-secret-key
+DEBUG=True
+DB_NAME=url_shortener
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5432
+JWT_SECRET_KEY=your-jwt-secret
+SHORT_CODE_LENGTH=8
+FRONTEND_URL=http://localhost:5173
+```
 
-- **Root `.env.example`**: Docker Compose configuration
-- **`backend/.env.example`**: Django settings
-- **`frontend/.env.example`**: React/Vite configuration
+### Frontend (.env)
+```
+VITE_API_BASE_URL=http://localhost:8000
+VITE_APP_NAME=URL Shortener
+```
 
-## Troubleshooting
+## Development Notes
 
-### Port already in use
+- All API endpoint URLs are defined in constants files - no hardcoded URLs
+- All configurable values come from environment variables
+- JWT tokens are stored in localStorage
+- Proper separation of concerns with dedicated apps for each feature
+- Material-UI theming for consistent UI design
 
-If you get port conflicts, change the ports in your `.env` file:
-- `BACKEND_PORT` for Django
-- `FRONTEND_PORT` for React
-- `POSTGRES_PORT` for PostgreSQL
+## Next Steps
 
-### Database connection errors
-
-Ensure:
-1. PostgreSQL container is healthy: `docker-compose ps`
-2. Database credentials in `backend/.env` match those in root `.env`
-3. `DB_HOST=db` in `backend/.env` (uses Docker service name)
-
-### Frontend can't connect to backend
-
-Check:
-1. `VITE_API_BASE_URL` in `frontend/.env` matches your backend URL
-2. CORS settings in `backend/.env` include your frontend URL
-3. Both services are running: `docker-compose ps`
-
-## Production Considerations
-
-⚠️ **This setup is for development only.** For production:
-
-1. Change `SECRET_KEY` in `backend/.env` to a secure random value
-2. Set `DEBUG=False` in `backend/.env`
-3. Configure proper `ALLOWED_HOSTS` in `backend/.env`
-4. Use production-ready web servers (gunicorn/uwsgi for Django, nginx for React)
-5. Set up proper SSL/TLS certificates
-6. Use managed database services or properly secured PostgreSQL
-7. Review and harden security settings
+- Implement namespace creation in the UI
+- Add short URL creation interface
+- Implement bulk URL shortening via Excel upload
+- Add analytics and click tracking
+- Implement user invitation system
+- Add URL redirection endpoint
 
 ## License
 
-[Your License Here]
-
+This project is private and proprietary.
