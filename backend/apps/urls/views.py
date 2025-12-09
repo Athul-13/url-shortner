@@ -1,6 +1,10 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from django.shortcuts import redirect
+from django.http import Http404
+from django.db import models
 from .models import ShortURL
 from .serializers import ShortURLSerializer
 from core.utils import is_organization_editor_or_admin
@@ -93,3 +97,37 @@ class ShortURLViewSet(viewsets.ModelViewSet):
         
         short_url.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class RedirectShortURLView(APIView):
+    """Public endpoint to redirect short URLs to their original destinations"""
+    permission_classes = [AllowAny]  # Public endpoint - no authentication required
+    
+    def get(self, request, namespace_name, short_code):
+        """
+        Redirect to the original URL and increment click count.
+        
+        Args:
+            namespace_name: The namespace name
+            short_code: The short code identifier
+            
+        Returns:
+            HTTP redirect to the original URL or 404 if not found
+        """
+        try:
+            # Look up the short URL by namespace name and short code
+            short_url = ShortURL.objects.select_related('namespace').get(
+                namespace__name=namespace_name,
+                short_code=short_code
+            )
+            
+            # Increment click count atomically to avoid race conditions
+            ShortURL.objects.filter(pk=short_url.pk).update(
+                click_count=models.F('click_count') + 1
+            )
+            
+            # Redirect to the original URL (temporary redirect, not cached)
+            return redirect(short_url.original_url, permanent=False)
+            
+        except ShortURL.DoesNotExist:
+            raise Http404("Short URL not found")

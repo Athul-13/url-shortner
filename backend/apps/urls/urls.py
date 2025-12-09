@@ -9,4 +9,6 @@ router.register(r'api/urls', views.ShortURLViewSet, basename='url')
 
 urlpatterns = [
     path('', include(router.urls)),
+    # Public redirect endpoint - must be after API routes
+    path('<str:namespace_name>/<str:short_code>/', views.RedirectShortURLView.as_view(), name='redirect'),
 ]

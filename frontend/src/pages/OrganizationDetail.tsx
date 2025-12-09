@@ -88,13 +88,26 @@ const OrganizationDetail = () => {
       await createShortURL.mutateAsync(submitData);
       handleCloseModal();
     } catch (error) {
-      const errorMessage =
-        (error as { response?: { data?: { error?: string; message?: string; short_code?: string[] } } })?.response?.data?.error ||
-        (error as { response?: { data?: { error?: string; message?: string; short_code?: string[] } } })?.response?.data?.message ||
-        (error as { response?: { data?: { error?: string; message?: string; short_code?: string[] } } })?.response?.data?.short_code?.[0] ||
-        (error as { message?: string })?.message ||
-        'An error occurred. Please try again.';
-      setError('root', { message: errorMessage });
+      // Handle field-specific errors from backend validation
+      const errorData = (error as { response?: { data?: any } })?.response?.data;
+      
+      if (errorData?.original_url) {
+        // Original URL already exists
+        const message = Array.isArray(errorData.original_url) ? errorData.original_url[0] : errorData.original_url;
+        setError('original_url', { message });
+      } else if (errorData?.short_code) {
+        // Short code already taken
+        const message = Array.isArray(errorData.short_code) ? errorData.short_code[0] : errorData.short_code;
+        setError('short_code', { message });
+      } else {
+        // General error
+        const errorMessage =
+          errorData?.error ||
+          errorData?.message ||
+          (error as { message?: string })?.message ||
+          'An error occurred. Please try again.';
+        setError('root', { message: errorMessage });
+      }
     }
   };
 

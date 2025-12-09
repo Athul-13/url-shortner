@@ -15,6 +15,8 @@ export const useURLs = (namespaceId?: number) => {
   return useQuery({
     queryKey: urlKeys.list(namespaceId),
     queryFn: () => urlService.getAll(namespaceId),
+    refetchInterval: 3000, // Poll every 3 seconds to keep click counts updated
+    refetchIntervalInBackground: false, // Pause polling when tab is not visible (saves resources)
   });
 };
 

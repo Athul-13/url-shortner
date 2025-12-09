@@ -18,6 +18,7 @@ import {
 } from '@mui/icons-material';
 import { useURLs, useDeleteShortURL } from '../hooks/queries/urls';
 import type { Namespace } from '../api/services/namespaces';
+import { API_BASE_URL } from '../constants/api';
 
 interface ShortenedURLsListProps {
   organizationId: number;
@@ -36,8 +37,9 @@ const ShortenedURLsList = ({ organizationId, namespaces, userRole }: ShortenedUR
   const namespaceIds = namespaces.map((ns) => ns.id);
   const organizationURLs = urls?.filter((url) => namespaceIds.includes(url.namespace)) || [];
 
-  const handleCopy = async (shortCode: string, id: number) => {
-    const shortURL = `${window.location.origin}/${shortCode}`;
+  const handleCopy = async (namespaceName: string, shortCode: string, id: number) => {
+    // Use backend URL since the redirect endpoint is on the backend, not frontend
+    const shortURL = `${API_BASE_URL}/${namespaceName}/${shortCode}`;
     try {
       await navigator.clipboard.writeText(shortURL);
       setCopiedId(id);
@@ -122,13 +124,12 @@ const ShortenedURLsList = ({ organizationId, namespaces, userRole }: ShortenedUR
                         fontFamily: 'monospace',
                       }}
                     >
-                      /{url.short_code}
+                      /{url.namespace_name}/{url.short_code}
                     </Typography>
-                    <Chip label={url.namespace_name} size="small" sx={{ height: 20, fontSize: '0.7rem' }} />
                     <Tooltip title={copiedId === url.id ? 'Copied!' : 'Copy short URL'}>
                       <IconButton
                         size="small"
-                        onClick={() => handleCopy(url.short_code, url.id)}
+                        onClick={() => handleCopy(url.namespace_name, url.short_code, url.id)}
                         sx={{
                           color: copiedId === url.id ? 'success.main' : 'text.secondary',
                         }}

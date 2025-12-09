@@ -34,45 +34,51 @@ class ShortURLSerializer(serializers.ModelSerializer):
         return value
     
     def validate(self, attrs):
+        # Check if original_url already exists (global uniqueness)
+        original_url = attrs.get('original_url')
+        if original_url:
+            existing_url = ShortURL.objects.filter(original_url=original_url)
+            # If updating, exclude current instance
+            if self.instance:
+                existing_url = existing_url.exclude(pk=self.instance.pk)
+            
+            if existing_url.exists():
+                existing = existing_url.first()
+                raise serializers.ValidationError({
+                    'original_url': f'This URL has already been shortened as: {existing.namespace.name}/{existing.short_code}'
+                })
+        
         # If short_code is not provided, generate one
         if not attrs.get('short_code'):
-            namespace = attrs.get('namespace')
-            attrs['short_code'] = self._generate_short_code(namespace)
+            attrs['short_code'] = self._generate_short_code()
         else:
-            # Check if short_code is unique within the namespace
-            namespace = attrs.get('namespace')
+            # Check if short_code is globally unique
             short_code = attrs.get('short_code')
             
-            # Check for uniqueness
-            exists = ShortURL.objects.filter(
-                namespace=namespace,
-                short_code=short_code
-            ).exists()
+            # Check for global uniqueness
+            exists = ShortURL.objects.filter(short_code=short_code)
             
             # If updating, exclude current instance
             if self.instance:
-                exists = exists and not ShortURL.objects.filter(
-                    namespace=namespace,
-                    short_code=short_code,
-                    pk=self.instance.pk
-                ).exists()
+                exists = exists.exclude(pk=self.instance.pk)
             
-            if exists:
+            if exists.exists():
                 raise serializers.ValidationError({
-                    'short_code': 'This short code is already taken in this namespace.'
+                    'short_code': 'This short code is already taken. Please choose a different one.'
                 })
         
         return attrs
     
-    def _generate_short_code(self, namespace):
-        """Generate a random short code"""
+    def _generate_short_code(self):
+        """Generate a globally unique random short code"""
         length = settings.SHORT_CODE_LENGTH
         charset = settings.SHORT_CODE_CHARSET
         
         max_attempts = 10
         for _ in range(max_attempts):
             short_code = ''.join(random.choices(charset, k=length))
-            if not ShortURL.objects.filter(namespace=namespace, short_code=short_code).exists():
+            # Check for global uniqueness
+            if not ShortURL.objects.filter(short_code=short_code).exists():
                 return short_code
         
         raise serializers.ValidationError("Unable to generate unique short code. Please try again.")

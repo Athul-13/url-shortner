@@ -5,8 +5,8 @@ from apps.namespaces.models import Namespace
 
 class ShortURL(models.Model):
     """Short URL model - stores shortened URLs"""
-    original_url = models.URLField(max_length=2048)
-    short_code = models.CharField(max_length=255)
+    original_url = models.URLField(max_length=2048, unique=True)
+    short_code = models.CharField(max_length=255, unique=True)
     namespace = models.ForeignKey(Namespace, on_delete=models.CASCADE, related_name='short_urls')
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_urls')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -14,12 +14,9 @@ class ShortURL(models.Model):
     click_count = models.PositiveIntegerField(default=0)
 
     class Meta:
-        unique_together = ['short_code', 'namespace']
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['namespace', 'short_code']),
             models.Index(fields=['namespace', '-created_at']),
-            models.Index(fields=['short_code']),
             models.Index(fields=['-created_at']),
         ]
 
