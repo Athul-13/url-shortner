@@ -17,8 +17,14 @@ class IsOrganizationAdmin(permissions.BasePermission):
         """
         Check if user is admin of the organization.
         Works with objects that have an 'organization' attribute,
-        or objects with 'namespace.organization' (like ShortURL).
+        or objects with 'namespace.organization' (like ShortURL),
+        or when the object itself is an Organization.
         """
+        # If the object itself is an Organization
+        from apps.organizations.models import Organization
+        if isinstance(obj, Organization):
+            return is_organization_admin(request.user, obj)
+        
         # Direct organization attribute (e.g., Namespace)
         if hasattr(obj, 'organization'):
             return is_organization_admin(request.user, obj.organization)

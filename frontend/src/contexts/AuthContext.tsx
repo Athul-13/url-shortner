@@ -7,7 +7,7 @@ import { isAuthenticated } from '../utils/auth';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (username: string, password: string, inviteToken?: string) => Promise<any>;
   register: (data: RegisterData) => Promise<{ isNewUser: boolean }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -49,10 +49,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     initAuth();
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string, inviteToken?: string) => {
     try {
-      const response = await authService.login({ username, password });
+      const response = await authService.login({ username, password, invite_token: inviteToken });
       setUser(response.user);
+      return response;
     } catch (error: any) {
       // Re-throw error so React Hook Form can handle it
       throw error;

@@ -11,4 +11,5 @@ export const ROUTES = {
   CREATE_ORGANIZATION: '/create-organization',
   ORGANIZATION_DETAIL: (id: number) => `/organizations/${id}`,
   NAMESPACES: '/namespaces',
+  INVITE: (token: string) => `/invite/${token}`,
 } as const;

@@ -1,7 +1,8 @@
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { TextField, Button, Box, Link, Typography } from '@mui/material';
+import { useNavigate, Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { TextField, Button, Box, Link, Typography, Alert } from '@mui/material';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import FormLayout from '../components/common/FormLayout';
 import { ROUTES } from '../constants/routes';
@@ -10,19 +11,41 @@ import { motion } from 'framer-motion';
 
 const Signup = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register: registerUser } = useAuth();
+  const [inviteInfo, setInviteInfo] = useState<{ email?: string; organization_name?: string; role?: string } | null>(null);
+
+  // Check for invite token in URL or localStorage
+  useEffect(() => {
+    const inviteToken = searchParams.get('invite_token') || localStorage.getItem('invite_token');
+    const storedInviteInfo = localStorage.getItem('invite_info');
+    
+    if (inviteToken && storedInviteInfo) {
+      try {
+        const info = JSON.parse(storedInviteInfo);
+        setInviteInfo(info);
+        // Pre-fill email if available
+        if (info.email) {
+          // Note: We can't directly set form values here, but we can show a message
+        }
+      } catch (e) {
+        // Invalid stored info
+      }
+    }
+  }, [searchParams]);
 
   const {
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
     setError,
+    setValue,
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
     mode: 'onChange',
     defaultValues: {
       username: '',
-      email: '',
+      email: inviteInfo?.email || '',
       password: '',
       password2: '',
       first_name: '',
@@ -30,11 +53,37 @@ const Signup = () => {
     },
   });
 
+  // Update email field when invite info is loaded
+  useEffect(() => {
+    if (inviteInfo?.email) {
+      setValue('email', inviteInfo.email);
+    }
+  }, [inviteInfo, setValue]);
+
   const onSubmit = async (data: SignupFormData) => {
     try {
-      await registerUser(data);
-      // After signup, redirect to create organization (onboarding flow)
-      navigate(ROUTES.CREATE_ORGANIZATION);
+      // Get invite token from URL or localStorage
+      const inviteToken = searchParams.get('invite_token') || localStorage.getItem('invite_token');
+      
+      // Include invite token in registration if present
+      const registerData = inviteToken ? { ...data, invite_token: inviteToken } : data;
+      
+      const response = await registerUser(registerData as any);
+      
+      // Clear invite token from localStorage
+      if (inviteToken) {
+        localStorage.removeItem('invite_token');
+        localStorage.removeItem('invite_info');
+      }
+      
+      // After signup, check if invitation was accepted
+      if (response.invitation_accepted && response.organization_id) {
+        // Redirect to organization detail page
+        navigate(ROUTES.ORGANIZATION_DETAIL(response.organization_id));
+      } else {
+        // Normal flow: redirect to create organization (onboarding flow)
+        navigate(ROUTES.CREATE_ORGANIZATION);
+      }
     } catch (error: any) {
       // Handle API errors
       const apiError = error.response?.data;
@@ -60,10 +109,16 @@ const Signup = () => {
 
   return (
     <FormLayout
-      title="Create Your Account"
-      subtitle="Get started with URL shortening in seconds"
+      title={inviteInfo ? `Join ${inviteInfo.organization_name}` : "Create Your Account"}
+      subtitle={inviteInfo ? `You've been invited as a ${inviteInfo.role}` : "Get started with URL shortening in seconds"}
       error={errors.root?.message}
     >
+      {inviteInfo && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          You've been invited to join <strong>{inviteInfo.organization_name}</strong> as a <strong>{inviteInfo.role}</strong>.
+          {inviteInfo.email && ` Please use the email ${inviteInfo.email} to sign up.`}
+        </Alert>
+      )}
       <Box
         component="form"
         onSubmit={handleSubmit(onSubmit)}

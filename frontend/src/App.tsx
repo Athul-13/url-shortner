@@ -11,6 +11,7 @@ import CreateOrganization from './pages/CreateOrganization';
 import Dashboard from './pages/Dashboard';
 import OrganizationDetail from './pages/OrganizationDetail';
 import Namespaces from './pages/Namespaces';
+import InviteAccept from './pages/InviteAccept';
 import { ROUTES } from './constants/routes';
 
 const theme = createTheme({
@@ -127,6 +128,10 @@ function App() {
                     <Namespaces />
                   </ProtectedRoute>
                 }
+              />
+              <Route
+                path="/invite/:token"
+                element={<InviteAccept />}
               />
               <Route path={ROUTES.HOME} element={<Navigate to={ROUTES.DASHBOARD} replace />} />
             </Routes>

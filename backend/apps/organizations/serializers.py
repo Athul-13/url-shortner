@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Organization, OrganizationMember
+from .models import Organization, OrganizationMember, OrganizationInvitation
 from django.contrib.auth.models import User
 
 
@@ -61,3 +61,54 @@ class OrganizationCreateSerializer(serializers.ModelSerializer):
             role='ADMIN'
         )
         return organization
+
+
+class OrganizationInvitationSerializer(serializers.ModelSerializer):
+    """Serializer for organization invitations"""
+    invited_by_username = serializers.CharField(source='invited_by.username', read_only=True)
+    organization_name = serializers.CharField(source='organization.name', read_only=True)
+    
+    class Meta:
+        model = OrganizationInvitation
+        fields = ['id', 'email', 'role', 'invited_by_username', 'organization_name', 
+                  'created_at', 'expires_at', 'accepted_at', 'status', 'token']
+        read_only_fields = ['id', 'created_at', 'expires_at', 'accepted_at', 'status', 
+                           'invited_by_username', 'organization_name', 'token']
+
+
+class InviteUserSerializer(serializers.Serializer):
+    """Serializer for creating invitations"""
+    email = serializers.EmailField(required=True)
+    role = serializers.ChoiceField(
+        choices=OrganizationMember.ROLE_CHOICES,
+        required=True
+    )
+    
+    def validate_email(self, value):
+        """Validate email format"""
+        return value.lower().strip()
+    
+    def validate_role(self, value):
+        """Validate role is one of the allowed choices"""
+        if value not in [choice[0] for choice in OrganizationMember.ROLE_CHOICES]:
+            raise serializers.ValidationError("Invalid role. Must be ADMIN, EDITOR, or VIEWER.")
+        return value
+
+
+class AcceptInvitationSerializer(serializers.Serializer):
+    """Serializer for accepting invitations"""
+    token = serializers.CharField(required=True)
+
+
+class UpdateMemberRoleSerializer(serializers.Serializer):
+    """Serializer for updating member roles"""
+    role = serializers.ChoiceField(
+        choices=OrganizationMember.ROLE_CHOICES,
+        required=True
+    )
+    
+    def validate_role(self, value):
+        """Validate role is one of the allowed choices"""
+        if value not in [choice[0] for choice in OrganizationMember.ROLE_CHOICES]:
+            raise serializers.ValidationError("Invalid role. Must be ADMIN, EDITOR, or VIEWER.")
+        return value

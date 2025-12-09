@@ -17,11 +17,13 @@ export interface RegisterData {
   password2: string;
   first_name?: string;
   last_name?: string;
+  invite_token?: string;
 }
 
 export interface LoginData {
   username: string;
   password: string;
+  invite_token?: string;
 }
 
 export interface AuthResponse {
@@ -31,6 +33,8 @@ export interface AuthResponse {
     refresh: string;
   };
   is_new_user?: boolean;
+  invitation_accepted?: boolean;
+  organization_id?: number;
 }
 
 export const authService = {
