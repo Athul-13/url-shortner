@@ -56,3 +56,21 @@ export const namespaceSchema = z.object({
 });
 
 export type NamespaceFormData = z.infer<typeof namespaceSchema>;
+
+// Short URL validation schema
+export const shortURLSchema = z.object({
+  original_url: z
+    .string()
+    .min(1, 'URL is required')
+    .url('Please enter a valid URL'),
+  namespace: z.number().min(1, 'Namespace is required'),
+  short_code: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^[a-zA-Z0-9_-]+$/.test(val),
+      'Short code can only contain letters, numbers, hyphens, and underscores'
+    ),
+});
+
+export type ShortURLFormData = z.infer<typeof shortURLSchema>;

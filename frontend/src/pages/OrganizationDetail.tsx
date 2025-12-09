@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import {
   Container,
   Box,
@@ -9,16 +10,28 @@ import {
   IconButton,
   Chip,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import {
   ArrowBack as ArrowBackIcon,
   Business as BusinessIcon,
   Folder as FolderIcon,
+  Link as LinkIcon,
 } from '@mui/icons-material';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useOrganization } from '../hooks/queries/organizations';
 import { useNamespaces } from '../hooks/queries/namespaces';
+import { useCreateShortURL } from '../hooks/queries/urls';
+import { shortURLSchema, type ShortURLFormData } from '../lib/validations';
 import { ROUTES } from '../constants/routes';
+import ShortenedURLsList from '../components/ShortenedURLsList';
 
 const OrganizationDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -27,8 +40,63 @@ const OrganizationDetail = () => {
 
   const { data: organization, isLoading: orgLoading, error: orgError } = useOrganization(organizationId);
   const { data: namespaces, isLoading: namespacesLoading } = useNamespaces(organizationId);
+  const createShortURL = useCreateShortURL();
+
+  const [openModal, setOpenModal] = useState(false);
 
   const isAdmin = organization?.user_role === 'ADMIN';
+  const isEditor = organization?.user_role === 'EDITOR';
+  const canCreateURL = isAdmin || isEditor;
+
+  const {
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    setError,
+    reset,
+  } = useForm<ShortURLFormData>({
+    resolver: zodResolver(shortURLSchema),
+    mode: 'onChange',
+    defaultValues: {
+      original_url: '',
+      namespace: 0,
+      short_code: '',
+    },
+  });
+
+  const handleOpenModal = () => {
+    reset({
+      original_url: '',
+      namespace: namespaces && namespaces.length > 0 ? namespaces[0].id : 0,
+      short_code: '',
+    });
+    setOpenModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setOpenModal(false);
+    reset();
+  };
+
+  const onSubmit = async (data: ShortURLFormData) => {
+    try {
+      const submitData = {
+        original_url: data.original_url,
+        namespace: data.namespace,
+        ...(data.short_code && data.short_code.trim() !== '' ? { short_code: data.short_code } : {}),
+      };
+      await createShortURL.mutateAsync(submitData);
+      handleCloseModal();
+    } catch (error) {
+      const errorMessage =
+        (error as { response?: { data?: { error?: string; message?: string; short_code?: string[] } } })?.response?.data?.error ||
+        (error as { response?: { data?: { error?: string; message?: string; short_code?: string[] } } })?.response?.data?.message ||
+        (error as { response?: { data?: { error?: string; message?: string; short_code?: string[] } } })?.response?.data?.short_code?.[0] ||
+        (error as { message?: string })?.message ||
+        'An error occurred. Please try again.';
+      setError('root', { message: errorMessage });
+    }
+  };
 
   if (orgLoading) {
     return (
@@ -122,6 +190,30 @@ const OrganizationDetail = () => {
                   </Box>
                 </Box>
               </Box>
+              {canCreateURL && (
+                <Button
+                  component={motion.button}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  variant="contained"
+                  startIcon={<LinkIcon />}
+                  onClick={handleOpenModal}
+                  sx={{
+                    borderRadius: 1.5,
+                    px: 3,
+                    py: 1,
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    textTransform: 'none',
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                    },
+                  }}
+                >
+                  Create Short URL
+                </Button>
+              )}
             </Box>
 
             <Box sx={{ mt: 3 }}>
@@ -282,6 +374,7 @@ const OrganizationDetail = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
+            sx={{ mb: 3 }}
           >
             <Paper
               elevation={8}
@@ -299,6 +392,118 @@ const OrganizationDetail = () => {
             </Paper>
           </Box>
         )}
+
+        {/* Shortened URLs Section */}
+        <Box
+          component={motion.div}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          sx={{ mt: 3 }}
+        >
+          <ShortenedURLsList
+            organizationId={organizationId}
+            namespaces={namespaces || []}
+            userRole={organization.user_role || 'VIEWER'}
+          />
+        </Box>
+
+        {/* Create Short URL Modal */}
+        <Dialog open={openModal} onClose={handleCloseModal} maxWidth="sm" fullWidth>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <DialogTitle sx={{ fontWeight: 600 }}>Create Short URL</DialogTitle>
+            <DialogContent>
+              {errors.root && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {errors.root.message}
+                </Alert>
+              )}
+
+              {namespaces && namespaces.length === 0 ? (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  No namespaces available. Please create a namespace first.
+                </Alert>
+              ) : null}
+
+              <Controller
+                name="original_url"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="URL to Shorten"
+                    fullWidth
+                    margin="normal"
+                    error={!!errors.original_url}
+                    helperText={errors.original_url?.message || 'Enter the full URL you want to shorten'}
+                    placeholder="https://example.com/very/long/url"
+                    autoFocus
+                  />
+                )}
+              />
+
+              <Controller
+                name="namespace"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    select
+                    label="Namespace"
+                    fullWidth
+                    margin="normal"
+                    error={!!errors.namespace}
+                    helperText={errors.namespace?.message || 'Select the namespace for this short URL'}
+                    disabled={!namespaces || namespaces.length === 0}
+                  >
+                    {namespaces?.map((namespace) => (
+                      <MenuItem key={namespace.id} value={namespace.id}>
+                        {namespace.name}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+              />
+
+              <Controller
+                name="short_code"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    label="Custom Short Code (Optional)"
+                    fullWidth
+                    margin="normal"
+                    error={!!errors.short_code}
+                    helperText={
+                      errors.short_code?.message ||
+                      'Leave empty to auto-generate. Only letters, numbers, hyphens, and underscores allowed.'
+                    }
+                    placeholder="my-custom-code"
+                  />
+                )}
+              />
+            </DialogContent>
+            <DialogActions sx={{ p: 2 }}>
+              <Button onClick={handleCloseModal} disabled={isSubmitting}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={isSubmitting || !namespaces || namespaces.length === 0}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+                  },
+                }}
+              >
+                {isSubmitting ? <CircularProgress size={20} /> : 'Create'}
+              </Button>
+            </DialogActions>
+          </form>
+        </Dialog>
       </Container>
     </Box>
   );
