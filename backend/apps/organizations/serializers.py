@@ -25,8 +25,18 @@ class OrganizationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_user_role(self, obj):
+        """
+        Get user's role in the organization.
+        Optimized to use prefetched members to avoid N+1 queries.
+        """
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Use prefetched members if available (from prefetch_related in queryset)
+            if hasattr(obj, 'members'):
+                for member in obj.members.all():
+                    if member.user_id == request.user.id:
+                        return member.role
+            # Fallback to query if prefetch not available
             member = OrganizationMember.objects.filter(
                 organization=obj,
                 user=request.user

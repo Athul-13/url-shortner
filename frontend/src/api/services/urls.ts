@@ -29,6 +29,11 @@ export const urlService = {
   async getAll(namespaceId?: number): Promise<ShortURL[]> {
     const params = namespaceId ? { namespace: namespaceId } : {};
     const response = await apiClient.get(URLS_LIST, { params });
+    // Handle paginated response (DRF format)
+    if (response.data.results) {
+      return response.data.results;
+    }
+    // Handle non-paginated response (fallback)
     return response.data;
   },
 

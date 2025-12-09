@@ -23,6 +23,11 @@ export const namespaceService = {
   async getAll(organizationId?: number): Promise<Namespace[]> {
     const params = organizationId ? { organization: organizationId } : {};
     const response = await apiClient.get(NAMESPACES_LIST, { params });
+    // Handle paginated response (DRF format)
+    if (response.data.results) {
+      return response.data.results;
+    }
+    // Handle non-paginated response (fallback)
     return response.data;
   },
 

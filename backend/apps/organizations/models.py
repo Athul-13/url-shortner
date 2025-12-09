@@ -10,6 +10,9 @@ class Organization(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+        ]
 
     def __str__(self):
         return self.name
@@ -31,6 +34,11 @@ class OrganizationMember(models.Model):
     class Meta:
         unique_together = ['user', 'organization']
         ordering = ['-joined_at']
+        indexes = [
+            models.Index(fields=['user', 'organization']),
+            models.Index(fields=['organization', 'role']),
+            models.Index(fields=['-joined_at']),
+        ]
 
     def __str__(self):
         return f"{self.user.username} - {self.organization.name} ({self.role})"

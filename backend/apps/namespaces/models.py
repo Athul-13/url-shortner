@@ -11,6 +11,10 @@ class Namespace(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['organization', '-created_at']),
+        ]
 
     def __str__(self):
         return self.name

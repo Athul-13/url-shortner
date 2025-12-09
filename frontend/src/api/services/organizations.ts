@@ -26,6 +26,11 @@ export interface CreateOrganizationData {
 export const organizationService = {
   async getAll(): Promise<Organization[]> {
     const response = await apiClient.get(ORGANIZATIONS_LIST);
+    // Handle paginated response (DRF format)
+    if (response.data.results) {
+      return response.data.results;
+    }
+    // Handle non-paginated response (fallback)
     return response.data;
   },
 

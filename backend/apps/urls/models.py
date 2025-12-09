@@ -16,6 +16,12 @@ class ShortURL(models.Model):
     class Meta:
         unique_together = ['short_code', 'namespace']
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['namespace', 'short_code']),
+            models.Index(fields=['namespace', '-created_at']),
+            models.Index(fields=['short_code']),
+            models.Index(fields=['-created_at']),
+        ]
 
     def __str__(self):
         return f"{self.short_code} -> {self.original_url}"

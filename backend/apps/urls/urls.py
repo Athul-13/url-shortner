@@ -1,9 +1,12 @@
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
 from . import views
 
 app_name = 'urls'
 
+router = DefaultRouter()
+router.register(r'api/urls', views.ShortURLViewSet, basename='url')
+
 urlpatterns = [
-    path('api/urls/', views.ShortURLViewSet.as_view({'get': 'list', 'post': 'create'}), name='url-list'),
-    path('api/urls/<int:pk>/', views.ShortURLViewSet.as_view({'get': 'retrieve', 'put': 'update', 'delete': 'destroy'}), name='url-detail'),
+    path('', include(router.urls)),
 ]

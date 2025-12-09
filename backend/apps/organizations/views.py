@@ -15,28 +15,33 @@ class OrganizationViewSet(viewsets.ModelViewSet):
         return OrganizationSerializer
     
     def get_queryset(self):
-        # Only return organizations where user is a member
+        """
+        Optimized queryset using prefetch_related to avoid N+1 queries.
+        Only return organizations where user is a member.
+        """
         return Organization.objects.filter(
             members__user=self.request.user
-        ).distinct()
+        ).prefetch_related('members__user').distinct()
     
     def list(self, request):
         """List all organizations where user is a member"""
         queryset = self.get_queryset()
+        
+        # Let DRF handle pagination automatically
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
         """Get organization details"""
-        try:
-            organization = self.get_queryset().get(pk=pk)
-            serializer = self.get_serializer(organization)
-            return Response(serializer.data)
-        except Organization.DoesNotExist:
-            return Response(
-                {'error': 'Organization not found'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Use DRF's get_object which handles 404 automatically
+        organization = self.get_object()
+        serializer = self.get_serializer(organization)
+        return Response(serializer.data)
     
     def create(self, request):
         """Create a new organization"""

@@ -1,10 +1,9 @@
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import action
 from .models import ShortURL
 from .serializers import ShortURLSerializer
-from apps.organizations.models import OrganizationMember
+from core.utils import is_organization_editor_or_admin
 
 
 class ShortURLViewSet(viewsets.ModelViewSet):
@@ -13,33 +12,46 @@ class ShortURLViewSet(viewsets.ModelViewSet):
     serializer_class = ShortURLSerializer
     
     def get_queryset(self):
-        # Only return URLs from namespaces in organizations where user is a member
-        user_orgs = OrganizationMember.objects.filter(user=self.request.user).values_list('organization', flat=True)
-        return ShortURL.objects.filter(namespace__organization__in=user_orgs)
+        """
+        Optimized queryset using join instead of subquery.
+        Only return URLs from namespaces in organizations where user is a member.
+        Uses select_related to avoid N+1 queries when accessing namespace and created_by.
+        """
+        return ShortURL.objects.filter(
+            namespace__organization__members__user=self.request.user
+        ).select_related('namespace', 'namespace__organization', 'created_by').distinct()
     
     def list(self, request):
         """List all short URLs from user's organizations"""
         queryset = self.get_queryset()
         
-        # Optional filtering by namespace
+        # Optional filtering by namespace with validation
         namespace_id = request.query_params.get('namespace')
         if namespace_id:
-            queryset = queryset.filter(namespace_id=namespace_id)
+            try:
+                namespace_id = int(namespace_id)
+                queryset = queryset.filter(namespace_id=namespace_id)
+            except (ValueError, TypeError):
+                return Response(
+                    {'error': 'Invalid namespace ID'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Let DRF handle pagination automatically
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     
     def retrieve(self, request, pk=None):
         """Get short URL details"""
-        try:
-            short_url = self.get_queryset().get(pk=pk)
-            serializer = self.get_serializer(short_url)
-            return Response(serializer.data)
-        except ShortURL.DoesNotExist:
-            return Response(
-                {'error': 'Short URL not found'}, 
-                status=status.HTTP_404_NOT_FOUND
-            )
+        # Use DRF's get_object which handles 404 automatically
+        short_url = self.get_object()
+        serializer = self.get_serializer(short_url)
+        return Response(serializer.data)
     
     def create(self, request):
         """Create a new short URL"""
@@ -50,56 +62,34 @@ class ShortURLViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def update(self, request, pk=None):
-        """Update a short URL"""
-        try:
-            short_url = self.get_queryset().get(pk=pk)
-            
-            # Check if user has permission to edit
-            member = OrganizationMember.objects.filter(
-                organization=short_url.namespace.organization,
-                user=request.user,
-                role__in=['ADMIN', 'EDITOR']
-            ).first()
-            
-            if not member:
-                return Response(
-                    {'error': 'You do not have permission to edit this URL'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            serializer = self.get_serializer(short_url, data=request.data, partial=True, context={'request': request})
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except ShortURL.DoesNotExist:
+        """Update a short URL (admin/editor only)"""
+        # Use DRF's get_object which handles 404 automatically
+        short_url = self.get_object()
+        
+        # Check if user has permission to edit
+        if not is_organization_editor_or_admin(request.user, short_url.namespace.organization):
             return Response(
-                {'error': 'Short URL not found'}, 
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'You do not have permission to edit this URL'}, 
+                status=status.HTTP_403_FORBIDDEN
             )
+        
+        serializer = self.get_serializer(short_url, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def destroy(self, request, pk=None):
-        """Delete a short URL"""
-        try:
-            short_url = self.get_queryset().get(pk=pk)
-            
-            # Check if user has permission to delete
-            member = OrganizationMember.objects.filter(
-                organization=short_url.namespace.organization,
-                user=request.user,
-                role__in=['ADMIN', 'EDITOR']
-            ).first()
-            
-            if not member:
-                return Response(
-                    {'error': 'You do not have permission to delete this URL'}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            short_url.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except ShortURL.DoesNotExist:
+        """Delete a short URL (admin/editor only)"""
+        # Use DRF's get_object which handles 404 automatically
+        short_url = self.get_object()
+        
+        # Check if user has permission to delete
+        if not is_organization_editor_or_admin(request.user, short_url.namespace.organization):
             return Response(
-                {'error': 'Short URL not found'}, 
-                status=status.HTTP_404_NOT_FOUND
+                {'error': 'You do not have permission to delete this URL'}, 
+                status=status.HTTP_403_FORBIDDEN
             )
+        
+        short_url.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
