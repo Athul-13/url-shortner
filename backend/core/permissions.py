@@ -16,10 +16,15 @@ class IsOrganizationAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         """
         Check if user is admin of the organization.
-        Works with objects that have an 'organization' attribute.
+        Works with objects that have an 'organization' attribute,
+        or objects with 'namespace.organization' (like ShortURL).
         """
+        # Direct organization attribute (e.g., Namespace)
         if hasattr(obj, 'organization'):
             return is_organization_admin(request.user, obj.organization)
+        # Nested through namespace (e.g., ShortURL)
+        elif hasattr(obj, 'namespace') and hasattr(obj.namespace, 'organization'):
+            return is_organization_admin(request.user, obj.namespace.organization)
         return False
 
 
@@ -34,10 +39,15 @@ class IsOrganizationEditorOrAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         """
         Check if user is editor or admin of the organization.
-        Works with objects that have an 'organization' attribute.
+        Works with objects that have an 'organization' attribute,
+        or objects with 'namespace.organization' (like ShortURL).
         """
+        # Direct organization attribute (e.g., Namespace)
         if hasattr(obj, 'organization'):
             return is_organization_editor_or_admin(request.user, obj.organization)
+        # Nested through namespace (e.g., ShortURL)
+        elif hasattr(obj, 'namespace') and hasattr(obj.namespace, 'organization'):
+            return is_organization_editor_or_admin(request.user, obj.namespace.organization)
         return False
 
 

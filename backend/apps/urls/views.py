@@ -7,13 +7,22 @@ from django.http import Http404
 from django.db import models
 from .models import ShortURL
 from .serializers import ShortURLSerializer
-from core.utils import is_organization_editor_or_admin
+from core.permissions import IsOrganizationEditorOrAdmin
 
 
 class ShortURLViewSet(viewsets.ModelViewSet):
     """ViewSet for short URLs"""
-    permission_classes = [IsAuthenticated]
     serializer_class = ShortURLSerializer
+    
+    def get_permissions(self):
+        """
+        Set different permissions for different actions.
+        - list, retrieve, create: Authenticated users only
+        - update, destroy: Organization editors or admins only
+        """
+        if self.action in ['update', 'partial_update', 'destroy']:
+            return [IsOrganizationEditorOrAdmin()]
+        return [IsAuthenticated()]
     
     def get_queryset(self):
         """
@@ -67,15 +76,8 @@ class ShortURLViewSet(viewsets.ModelViewSet):
     
     def update(self, request, pk=None):
         """Update a short URL (admin/editor only)"""
-        # Use DRF's get_object which handles 404 automatically
+        # Use DRF's get_object which handles 404 and permission check automatically
         short_url = self.get_object()
-        
-        # Check if user has permission to edit
-        if not is_organization_editor_or_admin(request.user, short_url.namespace.organization):
-            return Response(
-                {'error': 'You do not have permission to edit this URL'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         serializer = self.get_serializer(short_url, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
@@ -85,16 +87,8 @@ class ShortURLViewSet(viewsets.ModelViewSet):
     
     def destroy(self, request, pk=None):
         """Delete a short URL (admin/editor only)"""
-        # Use DRF's get_object which handles 404 automatically
+        # Use DRF's get_object which handles 404 and permission check automatically
         short_url = self.get_object()
-        
-        # Check if user has permission to delete
-        if not is_organization_editor_or_admin(request.user, short_url.namespace.organization):
-            return Response(
-                {'error': 'You do not have permission to delete this URL'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         short_url.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 

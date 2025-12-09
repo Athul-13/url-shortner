@@ -1,11 +1,10 @@
 from django.urls import path
 from . import views
-from core.constants import AUTH_REGISTER, AUTH_LOGIN, AUTH_ME
 
 app_name = 'users'
 
 urlpatterns = [
-    path(AUTH_REGISTER, views.register, name='register'),
-    path(AUTH_LOGIN, views.login, name='login'),
-    path(AUTH_ME, views.me, name='me'),
+    path('api/auth/register/', views.register, name='register'),
+    path('api/auth/login/', views.login, name='login'),
+    path('api/auth/me/', views.me, name='me'),
 ]

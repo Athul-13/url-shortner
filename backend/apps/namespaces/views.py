@@ -5,13 +5,22 @@ from django.shortcuts import get_object_or_404
 from .models import Namespace
 from .serializers import NamespaceSerializer
 from apps.organizations.models import OrganizationMember, Organization
-from core.utils import is_organization_admin
+from core.permissions import IsOrganizationAdmin
 
 
 class NamespaceViewSet(viewsets.ModelViewSet):
     """ViewSet for namespaces"""
-    permission_classes = [IsAuthenticated]
     serializer_class = NamespaceSerializer
+    
+    def get_permissions(self):
+        """
+        Set different permissions for different actions.
+        - list, retrieve: Authenticated users only
+        - create, update, destroy: Organization admins only
+        """
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsOrganizationAdmin()]
+        return [IsAuthenticated()]
     
     def get_queryset(self):
         """
@@ -57,38 +66,7 @@ class NamespaceViewSet(viewsets.ModelViewSet):
     
     def create(self, request):
         """Create a new namespace (admin only)"""
-        # Check if organization is provided
-        organization_id = request.data.get('organization')
-        if not organization_id:
-            return Response(
-                {'error': 'Organization is required'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Validate organization_id is an integer
-        try:
-            organization_id = int(organization_id)
-        except (ValueError, TypeError):
-            return Response(
-                {'error': 'Invalid organization ID'}, 
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Get organization and check membership
-        organization = get_object_or_404(
-            Organization.objects.filter(
-                members__user=request.user
-            ),
-            pk=organization_id
-        )
-        
-        # Check if user is an admin of the organization
-        if not is_organization_admin(request.user, organization):
-            return Response(
-                {'error': 'You must be an admin to create namespaces'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
+        # Permission check is handled by serializer's validate_organization
         serializer = self.get_serializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             namespace = serializer.save()
@@ -97,15 +75,8 @@ class NamespaceViewSet(viewsets.ModelViewSet):
     
     def update(self, request, pk=None):
         """Update a namespace (admin only)"""
-        # Use DRF's get_object which handles 404 automatically
+        # Use DRF's get_object which handles 404 and permission check automatically
         namespace = self.get_object()
-        
-        # Check if user is an admin of the organization
-        if not self._is_organization_admin(namespace.organization):
-            return Response(
-                {'error': 'You must be an admin to update namespaces'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
         
         serializer = self.get_serializer(namespace, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
@@ -115,15 +86,7 @@ class NamespaceViewSet(viewsets.ModelViewSet):
     
     def destroy(self, request, pk=None):
         """Delete a namespace (admin only)"""
-        # Use DRF's get_object which handles 404 automatically
+        # Use DRF's get_object which handles 404 and permission check automatically
         namespace = self.get_object()
-        
-        # Check if user is an admin of the organization
-        if not self._is_organization_admin(namespace.organization):
-            return Response(
-                {'error': 'You must be an admin to delete namespaces'}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         namespace.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
